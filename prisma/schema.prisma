@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ProjectSite {
+  id                        String                      @id
+  province                  String?
+  cityMunicipality          String?
+  barangay                  String?
+  siteName                  String
+  dateEstablished           DateTime?
+  remarks                   String?
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
+  BeneficiarySiteEnrollment BeneficiarySiteEnrollment[]
+  binhiProjects             BinhiProject[]
+  lawaProjects              LawaProject[]
+  trackers                  ProjectTracker[]
+}
+
+model LawaProject {
+  id                         String                       @id
+  projectSiteId              String
+  physicalTarget             Int?
+  actualTarget               Int?
+  typeOfLawa                 String?
+  lengthM                    Decimal?                     @db.Decimal(10, 2)
+  widthM                     Decimal?                     @db.Decimal(10, 2)
+  depthM                     Decimal?                     @db.Decimal(10, 2)
+  capacityWaterVolume        Decimal?                     @db.Decimal(12, 2)
+  noOfLawa                   Int?
+  noProducedAquaticResources Int?
+  noFacilitiesEstablished    Int?
+  noFacilitiesRepaired       Int?
+  areaUtilizedSqm            Decimal?                     @db.Decimal(12, 2)
+  projectedHarvest           Decimal?                     @db.Decimal(12, 2)
+  actualHarvest              Decimal?                     @db.Decimal(12, 2)
+  status                     String?
+  remarks                    String?
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+  projectSite                ProjectSite                  @relation(fields: [projectSiteId], references: [id])
+  LawaProjectBeneficiaryLink LawaProjectBeneficiaryLink[]
+}
+
+model BinhiProject {
+  id                          String                        @id
+  projectSiteId               String
+  actualBeneficiaries         Int?
+  areaUtilizedSqm             Decimal?                      @db.Decimal(12, 2)
+  totalNoBinhiPlanted         Int?
+  totalNoBinhiHarvested       Int?
+  noBinhiSitesEstablished     Int?
+  expectedYieldPerSqmKg       Decimal?                      @db.Decimal(12, 2)
+  projectedHarvestKg          Decimal?                      @db.Decimal(12, 2)
+  actualHarvestKg             Decimal?                      @db.Decimal(12, 2)
+  status                      String?
+  remarks                     String?
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @updatedAt
+  projectSite                 ProjectSite                   @relation(fields: [projectSiteId], references: [id])
+  BinhiProjectBeneficiaryLink BinhiProjectBeneficiaryLink[]
+}
+
+model ProjectTracker {
+  id                      String      @id
+  projectSiteId           String
+  physicalTarget          Int?
+  financialTargets        Decimal?    @db.Decimal(12, 2)
+  socialPreps             String?
+  cftDrrCca               String?
+  cfw                     String?
+  cftSustainability       String?
+  ffw                     String?
+  physicalAccomplishment  Int?
+  financialAccomplishment Decimal?    @db.Decimal(12, 2)
+  balance                 Decimal?    @db.Decimal(12, 2)
+  dateOfPayout            DateTime?
+  remarks                 String?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  projectSite             ProjectSite @relation(fields: [projectSiteId], references: [id])
+
+  @@index([projectSiteId])
+}
+
+model Beneficiary {
+  id                          String                        @id
+  name                        String
+  age                         Int?
+  sex                         String?
+  listahanPoor3               Boolean?
+  nonListahanPoor3            Boolean?
+  fourPsBeneficiary           Boolean?
+  withMswdoCertification      Boolean?
+  farmer                      Boolean?
+  fisherfolk                  Boolean?
+  informalSector              Boolean?
+  women                       Boolean?
+  pwd                         Boolean?
+  elderly                     Boolean?
+  ips                         Boolean?
+  soloParent                  Boolean?
+  youth                       Boolean?
+  formerRebel                 Boolean?
+  lgbtqia                     Boolean?
+  payoutAmount                Decimal?                      @db.Decimal(12, 2)
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @updatedAt
+  BeneficiarySiteEnrollment   BeneficiarySiteEnrollment[]
+  BinhiProjectBeneficiaryLink BinhiProjectBeneficiaryLink[]
+  LawaProjectBeneficiaryLink  LawaProjectBeneficiaryLink[]
+}
+
+model BeneficiarySiteEnrollment {
+  id            String      @id
+  beneficiaryId String
+  projectSiteId String
+  status        String?
+  dateEnrolled  DateTime?
+  dateEnded     DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime
+  Beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  ProjectSite   ProjectSite @relation(fields: [projectSiteId], references: [id])
+
+  @@index([beneficiaryId])
+  @@index([projectSiteId])
+}
+
+model BinhiProjectBeneficiaryLink {
+  id                  String       @id
+  binhiProjectId      String
+  beneficiaryId       String
+  participationStatus String?
+  dateLinked          DateTime?
+  dateUnlinked        DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime
+  Beneficiary         Beneficiary  @relation(fields: [beneficiaryId], references: [id])
+  BinhiProject        BinhiProject @relation(fields: [binhiProjectId], references: [id])
+
+  @@index([beneficiaryId])
+  @@index([binhiProjectId])
+}
+
+model LawaProjectBeneficiaryLink {
+  id                  String      @id
+  lawaProjectId       String
+  beneficiaryId       String
+  participationStatus String?
+  dateLinked          DateTime?
+  dateUnlinked        DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime
+  Beneficiary         Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  LawaProject         LawaProject @relation(fields: [lawaProjectId], references: [id])
+
+  @@index([beneficiaryId])
+  @@index([lawaProjectId])
+}

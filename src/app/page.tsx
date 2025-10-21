@@ -1,10 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react/no-unescaped-entities */
 import { prisma } from "@/lib/prisma"
-import { DashboardClient } from "@/components/dashboard/dashboard-client"
+// The DashboardClient is a client-only component. Import a small wrapper that dynamically
+// loads the real DashboardClient on the client. This keeps this file a Server Component.
+import DashboardClientWrapper from "@/components/dashboard/dashboard-client-wrapper"
 import {
   ProjectsManagementBinhiProject,
   ProjectsManagementLawaProject,
 } from "@/components/projects-management"
-import { BeneficiariesManagementRecord } from "@/components/beneficiaries-management"
+import type { BeneficiariesManagementRecord } from "@/types/beneficiaries"
+import { mapBeneficiariesToManagementRecords } from "@/lib/beneficiary-mappers"
 import { ProjectTrackerRecord } from "@/components/project-tracking"
 
 const projectStatusLabels: Record<string, "Planning" | "In Progress" | "Completed" | "On Hold"> = {
@@ -14,11 +18,7 @@ const projectStatusLabels: Record<string, "Planning" | "In Progress" | "Complete
   ON_HOLD: "On Hold",
 }
 
-const siteStatusLabels: Record<string, "Active" | "Planning" | "Completed"> = {
-  ACTIVE: "Active",
-  PLANNING: "Planning",
-  COMPLETED: "Completed",
-}
+// siteStatusLabels removed (unused)
 
 const trackerStatusLabels: Record<string, "On Track" | "Behind Schedule" | "At Risk" | "Completed"> = {
   ON_TRACK: "On Track",
@@ -31,11 +31,6 @@ const participationStatusLabels: Record<string, "Active" | "Inactive" | "Pending
   ACTIVE: "Active",
   INACTIVE: "Inactive",
   PENDING: "Pending",
-}
-
-const sexLabels: Record<string, "Male" | "Female"> = {
-  MALE: "Male",
-  FEMALE: "Female",
 }
 
 function toISOStringOrNull(date: Date | null): string | null {
@@ -131,7 +126,34 @@ export default async function DashboardPage() {
           BeneficiarySiteEnrollment: {
             include: {
               ProjectSite: {
-                select: { id: true },
+                select: {
+                  id: true,
+                  siteName: true,
+                  siteType: true,
+                  barangay: true,
+                  cityMunicipality: true,
+                  province: true,
+                },
+              },
+            },
+          },
+          LawaProjectBeneficiaryLink: {
+            include: {
+              LawaProject: {
+                select: {
+                  id: true,
+                  projectSiteId: true,
+                },
+              },
+            },
+          },
+          BinhiProjectBeneficiaryLink: {
+            include: {
+              BinhiProject: {
+                select: {
+                  id: true,
+                  projectSiteId: true,
+                },
               },
             },
           },
@@ -148,8 +170,8 @@ export default async function DashboardPage() {
         <div className="container mx-auto px-6">
           <div className="max-w-3xl rounded-lg border border-border bg-card p-6">
             <h2 className="text-xl font-semibold">Database connection error</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              The application couldn't reach the database. The dashboard will load once Prisma can connect to your
+              <p className="mt-2 text-sm text-muted-foreground">
+              The application couldn&apos;t reach the database. The dashboard will load once Prisma can connect to your
               database.
             </p>
             <div className="mt-4 text-sm">
@@ -200,11 +222,25 @@ npx prisma migrate reset --force`}
   }))
 
   type BinhiProjectWithSite = (typeof binhiProjectsRaw)[number]
+  // Build maps of linked beneficiaries per project from the beneficiary link relations we fetched
+  const binhiLinkCounts = new Map<string, number>()
+  const lawaLinkCounts = new Map<string, number>()
+  beneficiariesRaw.forEach((b: any) => {
+    ;(b.BinhiProjectBeneficiaryLink || []).forEach((link: any) => {
+      binhiLinkCounts.set(link.binhiProjectId, (binhiLinkCounts.get(link.binhiProjectId) || 0) + 1)
+    })
+    ;(b.LawaProjectBeneficiaryLink || []).forEach((link: any) => {
+      lawaLinkCounts.set(link.lawaProjectId, (lawaLinkCounts.get(link.lawaProjectId) || 0) + 1)
+    })
+  })
+
   const binhiProjects: ProjectsManagementBinhiProject[] = binhiProjectsRaw.map((project: BinhiProjectWithSite) => ({
     id: project.id,
     projectSiteId: project.projectSiteId,
     siteName: project.projectSite.siteName,
     actualBeneficiaries: project.actualBeneficiaries,
+    // number of beneficiaries actually linked to this Binhi project (derived from relations)
+    linkedBeneficiaries: binhiLinkCounts.get(project.id) ?? project.actualBeneficiaries ?? 0,
   areaUtilized: decimalToNumber(project.areaUtilized ?? (project as any).areaUtilizedSqm, 0),
     totalNoBinhiPlanted: project.totalNoBinhiPlanted,
     totalNoBinhiHarvested: project.totalNoBinhiHarvested,
@@ -239,45 +275,7 @@ npx prisma migrate reset --force`}
     status: trackerStatusLabels[tracker.status] ?? "On Track",
   }))
 
-  type BeneficiaryWithLinks = (typeof beneficiariesRaw)[number]
-  const beneficiaries: BeneficiariesManagementRecord[] = beneficiariesRaw.map((beneficiary: BeneficiaryWithLinks) => {
-    // Determine linked project site ids and latest enrollment date/status
-    const enrollments = beneficiary.BeneficiarySiteEnrollment ?? []
-    const projectSitesLinked = enrollments.map((link: any) => link.ProjectSite?.id).filter(Boolean)
-    const latestEnrollment = enrollments.reduce((acc: any, link: any) => {
-      if (!link) return acc
-      const d = link.dateEnrolled ? new Date(link.dateEnrolled).getTime() : 0
-      const accd = acc?.dateEnrolled ? new Date(acc.dateEnrolled).getTime() : 0
-      return d > accd ? link : acc
-    }, null)
-
-    return ({
-    id: beneficiary.id,
-    name: beneficiary.name,
-    age: beneficiary.age,
-    sex: sexLabels[beneficiary.sex] ?? "Female",
-    listahanPoor3: beneficiary.listahanPoor3,
-    nonListahanPoor3: beneficiary.nonListahanPoor3,
-    fourPsBeneficiary: beneficiary.fourPsBeneficiary,
-    withMswdoCertification: beneficiary.withMswdoCertification,
-    farmer: beneficiary.farmer,
-    fisherfolk: beneficiary.fisherfolk,
-    informalSector: beneficiary.informalSector,
-    women: beneficiary.women,
-    pwd: beneficiary.pwd,
-    elderly: beneficiary.elderly,
-    ips: beneficiary.ips,
-    soloParent: beneficiary.soloParent,
-    youth: beneficiary.youth,
-    formerRebel: beneficiary.formerRebel,
-    lgbtqia: beneficiary.lgbtqia,
-    payoutAmount: Number(beneficiary.payoutAmount),
-    // derive participation status from the latest enrollment if available
-    participationStatus: participationStatusLabels[latestEnrollment?.status ?? "ACTIVE"] ?? "Active",
-    projectSites: projectSitesLinked,
-    // use latest enrollment date if available
-    dateLinked: toISOStringOrNull(latestEnrollment?.dateEnrolled ?? null),
-  })})
+  const beneficiaries: BeneficiariesManagementRecord[] = mapBeneficiariesToManagementRecords(beneficiariesRaw)
 
   const metrics = {
     totalProjects: lawaProjects.length + binhiProjects.length,
@@ -328,6 +326,8 @@ npx prisma migrate reset --force`}
     .slice(-6)
     .map(([, value]) => value)
 
+  type BeneficiaryWithLinks = (typeof beneficiariesRaw)[number]
+
   const recentActivityCandidates = [
   ...lawaProjectsRaw.map((project: LawaProjectWithSite) => ({
       id: `lawa-${project.id}`,
@@ -374,14 +374,14 @@ npx prisma migrate reset --force`}
     }))
 
   return (
-    <DashboardClient
+    <DashboardClientWrapper
       metrics={metrics}
       projectDistribution={projectDistribution}
       monthlyProgress={monthlyProgress}
       recentActivity={recentActivity}
       lawaProjects={lawaProjects}
       binhiProjects={binhiProjects}
-  /* sites removed */
+      /* sites removed */
       beneficiaries={beneficiaries}
       trackers={trackers}
     />

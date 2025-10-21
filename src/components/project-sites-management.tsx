@@ -42,6 +42,9 @@ export function ProjectSitesManagement({ sites }: ProjectSitesManagementProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [selectedSite, setSelectedSite] = useState<ProjectSitesManagementSite | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [participantsDialogOpen, setParticipantsDialogOpen] = useState(false)
+  const [participantsList, setParticipantsList] = useState<any[] | null>(null)
+  const [participantsLoading, setParticipantsLoading] = useState(false)
 
   useEffect(() => {
     setSiteState(sites)
@@ -93,12 +96,15 @@ export function ProjectSitesManagement({ sites }: ProjectSitesManagementProps) {
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Add New Project Site</DialogTitle>
-              <DialogDescription>Create a new project site to start tracking Lawa and Binhi projects</DialogDescription>
-            </DialogHeader>
-            <AddSiteForm onClose={() => setIsAddDialogOpen(false)} />
-          </DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Project Site</DialogTitle>
+                <DialogDescription>Create a new project site to start tracking Lawa and Binhi projects</DialogDescription>
+              </DialogHeader>
+              <AddSiteForm
+                onClose={() => setIsAddDialogOpen(false)}
+                onCreate={(site) => setSiteState((prev) => [site, ...prev])}
+              />
+            </DialogContent>
         </Dialog>
       </div>
 
@@ -242,59 +248,195 @@ export function ProjectSitesManagement({ sites }: ProjectSitesManagementProps) {
             <DialogTitle>Site Details</DialogTitle>
             <DialogDescription>Complete information for {selectedSite?.siteName}</DialogDescription>
           </DialogHeader>
-          {selectedSite && <SiteDetailsView site={selectedSite} />}
+          {selectedSite && (
+            <SiteDetailsView
+              site={selectedSite}
+              onOpenParticipants={(opts: { projectId: string; type: "LAWA" | "BINHI"; projectLabel?: string }) => {
+                const { projectId, type, projectLabel } = opts
+                setParticipantsLoading(true)
+                setParticipantsList(null)
+                setParticipantsDialogOpen(true)
+                const url = `/api/projects/${type.toLowerCase()}/${projectId}/beneficiaries`
+                fetch(url)
+                  .then((r) => r.json())
+                  .then((data) => setParticipantsList(data || []))
+                  .catch((e) => {
+                    console.error('fetch participants error', e)
+                    setParticipantsList([])
+                  })
+                  .finally(() => setParticipantsLoading(false))
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Participants Dialog */}
+      <Dialog open={participantsDialogOpen} onOpenChange={setParticipantsDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Project Participants</DialogTitle>
+            <DialogDescription>Beneficiaries linked to the selected project</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {participantsLoading && <div className="text-sm text-muted-foreground">Loading participants…</div>}
+            {!participantsLoading && participantsList && participantsList.length === 0 && (
+              <div className="text-sm text-muted-foreground">No participants found for this project.</div>
+            )}
+            {!participantsLoading && participantsList && participantsList.length > 0 && (
+              <div className="space-y-2">
+                {participantsList.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between border-b py-2">
+                    <div>
+                      <div className="font-medium">{p.fullName}</div>
+                      <div className="text-sm text-muted-foreground">Age: {p.age} • {p.sex}</div>
+                    </div>
+                    <div className="text-sm text-muted-foreground">{p.participationStatus}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end pt-4">
+            <Button variant="ghost" onClick={() => setParticipantsDialogOpen(false)}>Close</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
   )
 }
 
-function AddSiteForm({ onClose }: { onClose: () => void }) {
+function AddSiteForm({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void
+  onCreate?: (site: any) => void
+}) {
+  const [siteName, setSiteName] = useState("")
+  const [province, setProvince] = useState("")
+  const [city, setCity] = useState("")
+  const [barangay, setBarangay] = useState("")
+  const [dateEstablished, setDateEstablished] = useState("")
+  const [remarks, setRemarks] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+
+    if (!siteName.trim()) {
+      setError("Site name is required")
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const body = {
+        siteName: siteName.trim(),
+        province: province.trim() || undefined,
+        cityMunicipalityCode: undefined,
+        cityMunicipality: city.trim() || undefined,
+        barangayCode: undefined,
+        barangay: barangay.trim() || undefined,
+        dateEstablished: dateEstablished || undefined,
+        remarks: remarks || undefined,
+      }
+
+      const res = await fetch(`/api/sites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(payload?.error || `Failed to create site (${res.status})`)
+      }
+
+      const created = await res.json()
+
+      if (onCreate) onCreate(created)
+      onClose()
+    } catch (err: any) {
+      setError(err?.message || "Failed to create site")
+      console.error("AddSiteForm submit error:", err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
-    <form className="space-y-4">
+    <form className="space-y-4" onSubmit={handleSubmit}>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="siteName">Site Name</Label>
-          <Input id="siteName" placeholder="Enter site name" />
+          <Input id="siteName" placeholder="Enter site name" value={siteName} onChange={(e) => setSiteName(e.target.value)} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="province">Province</Label>
-          <Input id="province" placeholder="Enter province" />
+          <Input id="province" placeholder="Enter province" value={province} onChange={(e) => setProvince(e.target.value)} />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="city">City/Municipality</Label>
-          <Input id="city" placeholder="Enter city or municipality" />
+          <Input id="city" placeholder="Enter city or municipality" value={city} onChange={(e) => setCity(e.target.value)} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="barangay">Barangay</Label>
-          <Input id="barangay" placeholder="Enter barangay" />
+          <Input id="barangay" placeholder="Enter barangay" value={barangay} onChange={(e) => setBarangay(e.target.value)} />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="dateEstablished">Date Established</Label>
-        <Input id="dateEstablished" type="date" />
+        <Input id="dateEstablished" type="date" value={dateEstablished} onChange={(e) => setDateEstablished(e.target.value)} />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="remarks">Remarks</Label>
-        <Textarea id="remarks" placeholder="Additional notes about this site..." />
+        <Textarea id="remarks" placeholder="Additional notes about this site..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
       </div>
 
+      {error && <div className="text-sm text-destructive">{error}</div>}
+
       <div className="flex justify-end space-x-2 pt-4">
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" type="button" onClick={onClose} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button onClick={onClose}>Create Site</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Creating..." : "Create Site"}
+        </Button>
       </div>
     </form>
   )
 }
 
-function SiteDetailsView({ site }: { site: ProjectSitesManagementSite }) {
+function SiteDetailsView({
+  site,
+  onOpenParticipants,
+}: {
+  site: ProjectSitesManagementSite
+  onOpenParticipants?: (opts: { projectId: string; type: "LAWA" | "BINHI"; projectLabel?: string }) => void
+}) {
+  // For now, we'll show simple project placeholders; ideally this should fetch projects for the site
+  const [lawaProjects, setLawaProjects] = useState<{ id: string; label: string }[]>([])
+  const [binhiProjects, setBinhiProjects] = useState<{ id: string; label: string }[]>([])
+
+  useEffect(() => {
+    // best-effort: fetch projects by site id; endpoints in this codebase return all projects, so we filter client-side
+    Promise.all([fetch('/api/projects/lawa').then(r => r.json()).catch(() => []), fetch('/api/projects/binhi').then(r => r.json()).catch(() => [])])
+      .then(([lawaAll, binhiAll]) => {
+        const lwa = (lawaAll || []).filter((p: any) => p.projectSiteId === site.id).map((p: any) => ({ id: p.id, label: p.id }))
+        const bnh = (binhiAll || []).filter((p: any) => p.projectSiteId === site.id).map((p: any) => ({ id: p.id, label: p.id }))
+        setLawaProjects(lwa)
+        setBinhiProjects(bnh)
+      })
+  }, [site.id])
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4">
@@ -323,10 +465,32 @@ function SiteDetailsView({ site }: { site: ProjectSitesManagementSite }) {
         <div>
           <Label className="text-sm font-medium text-muted-foreground">Lawa Projects</Label>
           <p className="text-2xl font-bold text-chart-1">{site.lawaProjects}</p>
+          <div className="mt-2 space-y-1">
+            {lawaProjects.length === 0 && <div className="text-sm text-muted-foreground">No Lawa projects listed</div>}
+            {lawaProjects.map((p) => (
+              <div key={p.id} className="flex items-center justify-between">
+                <div className="text-sm">{p.label}</div>
+                <Button variant="ghost" size="sm" onClick={() => onOpenParticipants && onOpenParticipants({ projectId: p.id, type: 'LAWA', projectLabel: p.label })}>
+                  View participants
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
         <div>
           <Label className="text-sm font-medium text-muted-foreground">Binhi Projects</Label>
           <p className="text-2xl font-bold text-chart-2">{site.binhiProjects}</p>
+          <div className="mt-2 space-y-1">
+            {binhiProjects.length === 0 && <div className="text-sm text-muted-foreground">No Binhi projects listed</div>}
+            {binhiProjects.map((p) => (
+              <div key={p.id} className="flex items-center justify-between">
+                <div className="text-sm">{p.label}</div>
+                <Button variant="ghost" size="sm" onClick={() => onOpenParticipants && onOpenParticipants({ projectId: p.id, type: 'BINHI', projectLabel: p.label })}>
+                  View participants
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
         <div>
           <Label className="text-sm font-medium text-muted-foreground">Total Beneficiaries</Label>

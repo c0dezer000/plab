@@ -256,7 +256,7 @@ export function ProjectTracking({ trackers }: ProjectTrackingProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-chart-2">{Math.round(averagePhysicalProgress) || 0}%</div>
-            <p className="text-xs text-muted-foreground">Across all projects</p>
+            <p className="text-xs text-muted-foreground">Average progress toward linked beneficiaries across projects</p>
           </CardContent>
         </Card>
       </div>
@@ -299,7 +299,7 @@ export function ProjectTracking({ trackers }: ProjectTrackingProps) {
         <Card>
           <CardHeader>
             <CardTitle>Physical Progress by Site</CardTitle>
-            <CardDescription>Target vs accomplished physical progress</CardDescription>
+            <CardDescription>Linked beneficiaries (physical target) vs accomplished</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -326,9 +326,9 @@ export function ProjectTracking({ trackers }: ProjectTrackingProps) {
                 </BarChart>
               </ResponsiveContainer>
             </ChartContainer>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
 
       {/* Tracking Table */}
       <Card>
@@ -362,7 +362,7 @@ export function ProjectTracking({ trackers }: ProjectTrackingProps) {
                   <TableCell>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span>Progress</span>
+                        <span>Progress (linked beneficiaries)</span>
                         <span>{Math.round((tracker.physicalAccomplishment / tracker.physicalTarget) * 100)}%</span>
                       </div>
                       <Progress
@@ -556,12 +556,12 @@ function TrackerDetailsView({ tracker }: { tracker: ProjectTrackerRecord }) {
             <Label className="text-sm font-medium text-muted-foreground">Physical Progress</Label>
             <div className="space-y-2 mt-2">
               <div className="flex justify-between text-sm">
-                <span>Progress</span>
+                <span>Progress (targeted beneficiaries)</span>
                 <span>{Math.round((tracker.physicalAccomplishment / tracker.physicalTarget) * 100)}%</span>
               </div>
               <Progress value={(tracker.physicalAccomplishment / tracker.physicalTarget) * 100} className="h-3" />
               <p className="text-sm text-muted-foreground">
-                {tracker.physicalAccomplishment} of {tracker.physicalTarget} completed
+                {tracker.physicalAccomplishment} of {tracker.physicalTarget} targeted beneficiaries reached
               </p>
             </div>
           </div>

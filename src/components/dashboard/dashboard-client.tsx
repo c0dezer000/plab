@@ -8,7 +8,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieCha
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Users, MapPin, Droplets, Sprout, FileText, Plus } from "lucide-react"
 import { ProjectsManagement, ProjectsManagementBinhiProject, ProjectsManagementLawaProject } from "@/components/projects-management"
-import { BeneficiariesManagement, BeneficiariesManagementRecord } from "@/components/beneficiaries-management"
+// Removed Manage Sites modal & related components
+// Removed useEffect/useState previously used by ManageSitesView
+import { BeneficiariesManagement } from "@/components/beneficiaries-management"
+import type { BeneficiariesManagementRecord } from "@/types/beneficiaries"
 import { ProjectTracking, ProjectTrackerRecord } from "@/components/project-tracking"
 
 interface ProjectDistributionDatum {
@@ -103,6 +106,7 @@ export function DashboardClient({
                 <FileText className="h-4 w-4 mr-2" />
                 Generate Report
               </Button>
+
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 New Project
@@ -159,7 +163,7 @@ export function DashboardClient({
           </Card>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
+  <Tabs id="dashboard-tabs" defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="projects">Projects</TabsTrigger>
@@ -294,3 +298,5 @@ export function DashboardClient({
     </div>
   )
 }
+
+// ManageSitesView removed as per request

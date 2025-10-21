@@ -10,10 +10,15 @@ datasource db {
 
 model ProjectSite {
   id                        String                      @id
+  regionCode                String?
+  provinceCode              String?
+  cityMunicipalityCode      String?
+  barangayCode              String?
   province                  String?
   cityMunicipality          String?
   barangay                  String?
   siteName                  String
+  siteType                  SiteType?                   @default(BOTH)
   dateEstablished           DateTime?
   remarks                   String?
   createdAt                 DateTime                    @default(now())
@@ -69,53 +74,56 @@ model BinhiProject {
 }
 
 model ProjectTracker {
-  id                      String      @id
+  id                      String                                @id
   projectSiteId           String
   physicalTarget          Int?
-  financialTargets        Decimal?    @db.Decimal(12, 2)
+  financialTargets        Decimal?                              @db.Decimal(12, 2)
   socialPreps             String?
   cftDrrCca               String?
   cfw                     String?
   cftSustainability       String?
   ffw                     String?
   physicalAccomplishment  Int?
-  financialAccomplishment Decimal?    @db.Decimal(12, 2)
-  balance                 Decimal?    @db.Decimal(12, 2)
+  financialAccomplishment Decimal?                              @db.Decimal(12, 2)
+  balance                 Decimal?                              @db.Decimal(12, 2)
   dateOfPayout            DateTime?
   remarks                 String?
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
-  projectSite             ProjectSite @relation(fields: [projectSiteId], references: [id])
+  createdAt               DateTime                              @default(now())
+  updatedAt               DateTime                              @updatedAt
+  projectSite             ProjectSite                           @relation(fields: [projectSiteId], references: [id])
+  BeneficiaryEnrollments  ProjectTrackerBeneficiaryEnrollment[]
 
   @@index([projectSiteId])
 }
 
 model Beneficiary {
-  id                          String                        @id
-  name                        String
-  age                         Int?
-  sex                         String?
-  listahanPoor3               Boolean?
-  nonListahanPoor3            Boolean?
-  fourPsBeneficiary           Boolean?
-  withMswdoCertification      Boolean?
-  farmer                      Boolean?
-  fisherfolk                  Boolean?
-  informalSector              Boolean?
-  women                       Boolean?
-  pwd                         Boolean?
-  elderly                     Boolean?
-  ips                         Boolean?
-  soloParent                  Boolean?
-  youth                       Boolean?
-  formerRebel                 Boolean?
-  lgbtqia                     Boolean?
-  payoutAmount                Decimal?                      @db.Decimal(12, 2)
-  createdAt                   DateTime                      @default(now())
-  updatedAt                   DateTime                      @updatedAt
-  BeneficiarySiteEnrollment   BeneficiarySiteEnrollment[]
-  BinhiProjectBeneficiaryLink BinhiProjectBeneficiaryLink[]
-  LawaProjectBeneficiaryLink  LawaProjectBeneficiaryLink[]
+  id                                  String                                @id
+  name                                String
+  age                                 Int?
+  sex                                 String?
+  listahanPoor3                       Boolean?
+  nonListahanPoor3                    Boolean?
+  fourPsBeneficiary                   Boolean?
+  withMswdoCertification              Boolean?
+  farmer                              Boolean?
+  fisherfolk                          Boolean?
+  informalSector                      Boolean?
+  women                               Boolean?
+  pwd                                 Boolean?
+  elderly                             Boolean?
+  ips                                 Boolean?
+  soloParent                          Boolean?
+  youth                               Boolean?
+  formerRebel                         Boolean?
+  lgbtqia                             Boolean?
+  payoutAmount                        Decimal?                              @db.Decimal(12, 2)
+  createdAt                           DateTime                              @default(now())
+  updatedAt                           DateTime                              @updatedAt
+  birthdate                           DateTime?
+  BeneficiarySiteEnrollment           BeneficiarySiteEnrollment[]
+  BinhiProjectBeneficiaryLink         BinhiProjectBeneficiaryLink[]
+  LawaProjectBeneficiaryLink          LawaProjectBeneficiaryLink[]
+  ProjectTrackerBeneficiaryEnrollment ProjectTrackerBeneficiaryEnrollment[]
 }
 
 model BeneficiarySiteEnrollment {
@@ -164,4 +172,49 @@ model LawaProjectBeneficiaryLink {
 
   @@index([beneficiaryId])
   @@index([lawaProjectId])
+}
+
+model ProjectTrackerBeneficiaryEnrollment {
+  id                 String            @id @default(uuid())
+  projectTrackerId   String
+  beneficiaryId      String
+  stage              TrackerStage      @default(SOCIAL_PREPS)
+  stageStartedAt     DateTime?
+  stageCompletedAt   DateTime?
+  attendanceCount    Int?
+  attendanceNotes    String?
+  compensationType   CompensationType?
+  compensationAmount Decimal?          @db.Decimal(12, 2)
+  payoutDate         DateTime?
+  documents          Json?
+  remarks            String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  Beneficiary        Beneficiary       @relation(fields: [beneficiaryId], references: [id])
+  ProjectTracker     ProjectTracker    @relation(fields: [projectTrackerId], references: [id])
+
+  @@index([projectTrackerId])
+  @@index([beneficiaryId])
+  @@index([stage])
+}
+
+enum SiteType {
+  BINHI
+  LAWA
+  BOTH
+}
+
+enum TrackerStage {
+  SOCIAL_PREPS
+  CFT
+  CFW
+  FFW
+  CFT_SUSTAINABILITY
+  COMPLETED
+}
+
+enum CompensationType {
+  CASH
+  FOOD
+  NONE
 }
